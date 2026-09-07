@@ -1,0 +1,178 @@
+[
+	{
+		"dispositivo": "H1",
+		"interface": "eth0",
+		"IPv4": "10.0.1.10",
+		"Physical Address": "AA:00:00:00:01:0A"
+	},
+	{
+		"dispositivo": "H2",
+		"interface": "eth0",
+		"IPv4": "10.0.1.11",
+		"Physical Address": "AA:00:00:00:01:0B"
+	},
+	{
+		"dispositivo": "H3",
+		"interface": "eth0",
+		"IPv4": "10.0.2.10",
+		"Physical Address": "AA:00:00:00:02:0A"
+	},
+	{
+		"dispositivo": "H4",
+		"interface": "eth0",
+		"IPv4": "10.0.3.10",
+		"Physical Address": "AA:00:00:00:03:0A"
+	},
+	{
+		"dispositivo": "H5",
+		"interface": "eth0",
+		"IPv4": "10.0.3.11",
+		"Physical Address": "AA:00:00:00:03:0B"
+	},
+	{
+		"dispositivo": "R1",
+		"interface": [
+			{
+				"": "e0",
+				"info": "Rede A"
+			},
+			{
+				"": "e1",
+				"info": "para R4"
+			},
+			{
+				"": "e2",
+				"info": "para R2"
+			}
+		],
+		"IPv4": [
+			{
+				"": "10.0.1.1"
+			},
+			{
+				"": "10.0.14.1"
+			},
+			{
+				"": "10.0.12.1"
+			}
+		],
+		"Physical Address": [
+			{
+				"": "BB:00:00:00:01:00"
+			},
+			{
+				"": "BB:00:00:00:01:01"
+			},
+			{
+				"": "BB:00:00:00:01:02"
+			}
+		]
+	},
+	{
+		"dispositivo": "R2",
+		"interface": [
+			{
+				"": "e0",
+				"info": "para R1"
+			},
+			{
+				"": "e1",
+				"info": "para R3"
+			},
+			{
+				"": "e2",
+				"info": "Rede B"
+			}
+		],
+		"IPv4": [
+			{
+				"": "10.0.12.2"
+			},
+			{
+				"": "10.0.23.2"
+			},
+			{
+				"": "10.0.2.1"
+			}
+		],
+		"Physical Address": [
+			{
+				"": "BB:00:00:00:02:00"
+			},
+			{
+				"": "BB:00:00:00:02:01"
+			},
+			{
+				"": "BB:00:00:00:02:02"
+			}
+		]
+	},
+	{
+		"dispositivo": "R3",
+		"interface": [
+			{
+				"": "e0",
+				"info": "para R4"
+			},
+			{
+				"": "e1",
+				"info": "para R2"
+			},
+			{
+				"": "e2",
+				"info": "Rede C"
+			}
+		],
+		"IPv4": [
+			{
+				"": "10.0.34.3"
+			},
+			{
+				"": "10.0.23.3"
+			},
+			{
+				"": "10.0.3.1"
+			}
+		],
+		"Physical Address": [
+			{
+				"": "BB:00:00:00:03:00"
+			},
+			{
+				"": "BB:00:00:00:03:01"
+			},
+			{
+				"": "BB:00:00:00:03:02"
+			}
+		]
+	},
+	{
+		"dispositivo": "R4",
+		"interface": [
+			{
+				"": "e0",
+				"info": "para R1"
+			},
+			{
+				"": "e1",
+				"info": "para R3"
+			}
+		],
+		"IPv4": [
+			{
+				"": "10.0.14.4"
+			},
+			{
+				"": "10.0.34.4"
+			}
+		],
+		"Physical Address": [
+			{
+				"": "BB:00:00:00:04:00"
+			},
+			{
+				"": "BB:00:00:00:04:01"
+			}
+		]
+	}
+]
