@@ -21,3 +21,13 @@ camadas = [
     CamadaOSI("2 - Enlace"),
     CamadaOSI("1 - Física")
 ]
+
+def Lay_7(input):
+    pass
+
+# Camada 6
+# Converter texto em sequência de octetos, registrar o esquema de codificação 
+# e cifrar o conteúdo, que só é decifrado na camada 6 do destino.
+def Lay_6(message):
+    hex_value = message.encode('utf-8').hex()
+    return hex_value
