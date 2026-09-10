@@ -1,30 +1,15 @@
-import json
-
-
-class PDU:
-    def __init__(self, mensagem, destino_nome, processo_origem=None, processo_destino=None):
-        self.dados = mensagem
-        self.destino_nome = destino_nome
-        self.processo_origem = processo_origem
-        self.processo_destino = processo_destino
-        self.cabecalhos = []
-        self.unidade = "mensagem"
-        self.sessao_id = None
-        self.portas = None
-        self.logicos = None
-        self.fisicos = None
-
-    def empilhar_cabecalho(self, camada, tamanho):
-        self.cabecalhos.append({"camada": camada, "tamanho": tamanho})
+from pdu import *
+from rede import *
 
 # Camada 7
 # Gerar a mensagem e identificar o
 # processo pelo nome (endereço específico).
 class Lay_7:
-    def criar_mens():
-        input_string = input('Digite um número: ')
-        dados_atuais = Lay_6.Criptografar(input_string)
-        return print(dados_atuais)
+    @staticmethod
+    def criar_mens(computador, mensagem, destino_nome, processo_origem=None, processo_destino=None):
+        pdu = PDU(mensagem, destino_nome, processo_origem, processo_destino)
+        print(f'[{computador.nome}] L7 GERA: destino -> {destino_nome}')
+        return Lay_6.criptografar(computador, pdu)
 
 # Camada 6
 # Converter texto em sequência de octetos, registrar o esquema de codificação 
@@ -35,6 +20,12 @@ class Lay_6:
         pdu.dados = pdu.dados.encode('utf-8')
         print(f'[{computador.nome}] L6 CODIFICA: octetos UTF-8, conteudo cifrado')
         return Lay_5.abrirCom(computador, pdu)
+
+    @staticmethod
+    def descriptografar(destino_nome, pdu):
+        pdu.dados = pdu.dados.decode('utf-8')
+        print(f'[{destino_nome.nome}] L6 CODIFICA: octetos UTF-8, conteudo cifrado')
+        return Lay_5.abrirCom(destino_nome, pdu)
 
 # Camada 5
 # Abrir, manter e encerrar o diálogo,
@@ -84,12 +75,27 @@ class Lay_3:
         return Lay_2.enquadrar(dispositivo, pdu)
 
     @staticmethod
+    def selfencaminhar(dispositivo, pdu):
+        destino_bruto = Lay_3.buscar_dispositivo(dispositivo.nome)
+        if destino_bruto is None:
+            print(f'[{pdu.destino_nome}] L3 DESCARTA: destino {dispositivo.nome} inalcancavel')
+            return None
+
+        if pdu.logicos is None:
+            pdu.logicos = (dispositivo.interfaces[0]["IPv4"], None)  # TODO: IP real do destino
+            pdu.unidade = "pacote"
+
+        print(f'[{pdu.destino_nome}] L3 ENCAPSULA/ROTEIA: {pdu.logicos}')
+        # TODO: consultar tabela de encaminhamento (rede.py) para decidir o proximo salto real
+        return Lay_4.enquadrar(dispositivo, pdu)
+
+    @staticmethod
     def buscar_dispositivo(nome):
         try:
-            with open("topologia.json", "r") as file:
+            with open(Topologia, "r") as file:
                 data = json.load(file)
         except FileNotFoundError:
-            print("Error: 'topologia.json' file was not found.")
+            print(f"Error: '{Topologia}' file was not found.")
             return None
         for bruto in data:
             if bruto["dispositivo"] == nome:
@@ -107,6 +113,15 @@ class Lay_2:
         # TODO: par de enderecos fisicos do salto corrente (rede.py fornece o proximo salto)
         print(f'[{dispositivo.nome}] L2 ENQUADRA')
         return Lay_1.transmitir(dispositivo, pdu)
+
+    @staticmethod
+    def desenquadrar(dispositivo, pdu):
+        pdu.unidade = "quadro"
+        # TODO: par de enderecos fisicos do salto corrente (rede.py fornece o proximo salto)
+        print(f'[{pdu.destino_nome}] L2 DESENQUADRA')
+        return Lay_3.transmitir(dispositivo, pdu)
+
+    
     
 # Camada 1
 # Converter o quadro em uma sequência de
@@ -115,4 +130,9 @@ class Lay_1:
     @staticmethod
     def transmitir(dispositivo, pdu):
         print(f'[{dispositivo.nome}] L1 TRANSMITE')
-        return pdu
+        return Lay_1.receber(dispositivo, pdu)
+
+    @staticmethod
+    def receber(dispositivo, pdu):
+        print(f'[{pdu.destino_nome}] L1 RECEBE')
+        return Lay_2.desenquadrar(dispositivo, pdu)
