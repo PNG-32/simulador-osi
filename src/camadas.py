@@ -11,6 +11,11 @@ class Lay_7:
         print(f'[{computador.nome}] L7 GERA: destino -> {destino_nome}')
         return Lay_6.criptografar(computador, pdu)
 
+    @staticmethod
+    def receb_mens(computador, pdu):
+        print(f'[{pdu.destino_nome}] L7 ENTREGA: receber -> {computador.nome}')
+        print(f'[{pdu.destino_nome}] MENSAGEM DO {computador.nome} -> {pdu.dados}\n')
+
 # Camada 6
 # Converter texto em sequência de octetos, registrar o esquema de codificação 
 # e cifrar o conteúdo, que só é decifrado na camada 6 do destino.
@@ -22,10 +27,10 @@ class Lay_6:
         return Lay_5.abrirCom(computador, pdu)
 
     @staticmethod
-    def descriptografar(destino_nome, pdu):
+    def descriptografar(computador, pdu):
         pdu.dados = pdu.dados.decode('utf-8')
-        print(f'[{destino_nome.nome}] L6 CODIFICA: octetos UTF-8, conteudo cifrado')
-        return Lay_5.abrirCom(destino_nome, pdu)
+        print(f'[{pdu.destino_nome}] L6 DECODIFICA: octetos UTF-8, conteudo cifrado')
+        return Lay_7.receb_mens(computador, pdu)
 
 # Camada 5
 # Abrir, manter e encerrar o diálogo,
@@ -39,6 +44,11 @@ class Lay_5:
         pdu.sessao_id = f"S-{Lay_5._contador_sessao:04d}"
         print(f'[{computador.nome}] L5 ABRE: sessao {pdu.sessao_id} estabelecida')
         return Lay_4.segmentar(computador, pdu)
+
+    @staticmethod
+    def FecharCom(computador, pdu):
+        print(f'[{pdu.destino_nome}] L5 FECHA: sessao {pdu.sessao_id} estabelecida')
+        return Lay_6.descriptografar(computador, pdu)
 
 # Camada 4
 #Numerar portas de origem e destino,
@@ -54,6 +64,14 @@ class Lay_4:
         # TODO (C7): dividir em >= 3 segmentos numerados quando exceder o limite adotado
         print(f'[{computador.nome}] L4 SEGMENTA: porta {pdu.processo_origem} -> {pdu.processo_destino}')
         return Lay_3.encaminhar(computador, pdu)
+    
+    @staticmethod
+    def remonta(computador, pdu):
+        pdu.portas = (pdu.processo_origem, pdu.processo_destino)
+        pdu.unidade = "segmento"
+        # TODO (C7): dividir em >= 3 segmentos numerados quando exceder o limite adotado
+        print(f'[{pdu.destino_nome}] L4 REMONTA: porta {pdu.processo_destino} -> {pdu.processo_origem}')
+        return Lay_5.FecharCom(computador, pdu)
 
 # Camada 3
 # Inserir o par de endereços lógicos e
@@ -67,27 +85,20 @@ class Lay_3:
             return None
 
         if pdu.logicos is None:
-            pdu.logicos = (dispositivo.interfaces[0]["IPv4"], None)  # TODO: IP real do destino
+            pdu.logicos = (dispositivo.interfaces[0]["IPv4"], None) 
             pdu.unidade = "pacote"
 
         print(f'[{dispositivo.nome}] L3 ENCAPSULA/ROTEIA: {pdu.logicos}')
-        # TODO: consultar tabela de encaminhamento (rede.py) para decidir o proximo salto real
         return Lay_2.enquadrar(dispositivo, pdu)
 
     @staticmethod
-    def selfencaminhar(dispositivo, pdu):
-        destino_bruto = Lay_3.buscar_dispositivo(dispositivo.nome)
-        if destino_bruto is None:
-            print(f'[{pdu.destino_nome}] L3 DESCARTA: destino {dispositivo.nome} inalcancavel')
-            return None
-
-        if pdu.logicos is None:
-            pdu.logicos = (dispositivo.interfaces[0]["IPv4"], None)  # TODO: IP real do destino
-            pdu.unidade = "pacote"
-
-        print(f'[{pdu.destino_nome}] L3 ENCAPSULA/ROTEIA: {pdu.logicos}')
-        # TODO: consultar tabela de encaminhamento (rede.py) para decidir o proximo salto real
-        return Lay_4.enquadrar(dispositivo, pdu)
+    def receber(dispositivo, pdu):
+        pdu.unidade = "pacote"
+        if dispositivo.nome == pdu.destino_nome:
+            print(f'[{dispositivo.nome}] L3 ENTREGA: pacote chegou ao destino final')
+            return Lay_4.remontar(dispositivo, pdu)
+        print(f'[{dispositivo.nome}] L3 REPASSA: nao sou o destino, continuo roteando')
+        return Lay_4.remonta(dispositivo, pdu)
 
     @staticmethod
     def buscar_dispositivo(nome):
@@ -110,16 +121,14 @@ class Lay_2:
     @staticmethod
     def enquadrar(dispositivo, pdu):
         pdu.unidade = "quadro"
-        # TODO: par de enderecos fisicos do salto corrente (rede.py fornece o proximo salto)
         print(f'[{dispositivo.nome}] L2 ENQUADRA')
         return Lay_1.transmitir(dispositivo, pdu)
 
     @staticmethod
     def desenquadrar(dispositivo, pdu):
-        pdu.unidade = "quadro"
-        # TODO: par de enderecos fisicos do salto corrente (rede.py fornece o proximo salto)
+        pdu.unidade = "pacote"
         print(f'[{pdu.destino_nome}] L2 DESENQUADRA')
-        return Lay_3.transmitir(dispositivo, pdu)
+        return Lay_3.receber(dispositivo, pdu)
 
     
     
