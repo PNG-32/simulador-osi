@@ -24,6 +24,7 @@ def _normalizar_interfaces(bruto):
         interfaces.append({
             "interface": iface[""],
             "info": iface.get("info", ""),
+            "custo": iface.get("custo"),
             "IPv4": bruto["IPv4"][i][""],
             "fisico": bruto["Physical Address"][i][""],
         })
@@ -56,17 +57,160 @@ def carregar_dispositivos(caminho="topologia.json"):
     return dispositivos
 
 
+def _prefixo_rede(ip):
+    """Prefixo /24: os 3 primeiros octetos do IPv4."""
+    return ".".join(ip.split(".")[:3])
+
+def _construir_grafo():
+    """Monta, a partir do topologia.json:
+    - grafo: {roteador: {roteador_vizinho: custo}}, so enlaces
+      roteador-roteador (interfaces cujo info comeca com 'para ').
+    - lans: {prefixo_rede: (roteador_de_entrada, nome_da_interface_local)},
+      para as interfaces de roteador que dao numa rede local (info
+      'Rede X'), usado para saber por qual roteador uma rede e servida.
+    """
+    grafo = {}
+    lans = {}
+    for bruto in _carregar_bruto():
+        if isinstance(bruto["interface"], str):
+            continue  # e host, nao participa do grafo de roteadores
+        nome_roteador = bruto["dispositivo"]
+        grafo.setdefault(nome_roteador, {})
+        for i, iface in enumerate(bruto["interface"]):
+            info = iface.get("info", "")
+            ip = bruto["IPv4"][i][""]
+            if info.startswith("para "):
+                vizinho = info[len("para "):].strip()
+                custo = iface.get("custo")
+                if custo is not None:
+                    grafo[nome_roteador][vizinho] = custo
+            else:
+                lans[_prefixo_rede(ip)] = (nome_roteador, iface[""])
+    return grafo, lans
+
+
+def _iface_para_vizinho(nome_roteador, nome_vizinho):
+    """Interface normalizada do roteador nome_roteador cujo info e
+    'para {nome_vizinho}'. None se nao existir tal interface."""
+    for bruto in _carregar_bruto():
+        if bruto["dispositivo"] != nome_roteador or isinstance(bruto["interface"], str):
+            continue
+        for i, iface in enumerate(bruto["interface"]):
+            if iface.get("info", "") == f"para {nome_vizinho}":
+                return _normalizar_interfaces(bruto)[i]
+    return None
+
+
+def _dijkstra(grafo, origem):
+    """Caminho de menor custo a partir de origem. Devolve o dict
+    'anterior', usado para reconstruir o caminho ate qualquer destino."""
+    import heapq
+    dist = {origem: 0}
+    anterior = {}
+    fila = [(0, origem)]
+    visitados = set()
+    while fila:
+        d, atual = heapq.heappop(fila)
+        if atual in visitados:
+            continue
+        visitados.add(atual)
+        for vizinho, custo in grafo.get(atual, {}).items():
+            nova_dist = d + custo
+            if nova_dist < dist.get(vizinho, float("inf")):
+                dist[vizinho] = nova_dist
+                anterior[vizinho] = atual
+                heapq.heappush(fila, (nova_dist, vizinho))
+    return anterior
+
+
+def _reconstruir_caminho(anterior, origem, destino):
+    if destino == origem:
+        return [origem]
+    if destino not in anterior:
+        return None
+    caminho = [destino]
+    while caminho[-1] != origem:
+        caminho.append(anterior[caminho[-1]])
+    return list(reversed(caminho))
+
+
+def ip_de(nome):
+    """IP da (unica) interface de um host. Usado pela camada 3 para
+    preencher o par de enderecos logicos na origem."""
+    dispositivo = carregar_dispositivos().get(nome)
+    return dispositivo.interfaces[0]["IPv4"] if dispositivo else None
+
+
+def proximo_salto(dispositivo_atual, destino_nome):
+    """Decide o proximo salto no caminho de menor custo entre
+    dispositivo_atual e destino_nome (requisito R5).
+
+    Devolve (proximo_dispositivo, iface_saida, iface_entrada) ou
+    (None, None, None) se o destino for inalcancavel.
+    - proximo_dispositivo: objeto Computador/Roteador que recebe o
+      quadro no enlace atual (pode ja ser o destino final).
+    - iface_saida: interface normalizada de dispositivo_atual usada
+      para transmitir (dela sai o endereco fisico de origem, R3).
+    - iface_entrada: interface normalizada de proximo_dispositivo do
+      lado que recebe (dela sai o endereco fisico de destino, R3).
+    """
+    from dispositivos import Roteador
+
+    dispositivos = carregar_dispositivos()
+    destino = dispositivos.get(destino_nome)
+    if destino is None or dispositivo_atual.nome == destino_nome:
+        return None, None, None
+
+    grafo, lans = _construir_grafo()
+    prefixo_destino = _prefixo_rede(destino.interfaces[0]["IPv4"])
+    router_destino, iface_destino_nome = lans.get(prefixo_destino, (None, None))
+    if router_destino is None:
+        return None, None, None
+
+    if not isinstance(dispositivo_atual, Roteador):
+        # dispositivo_atual e um host (Computador)
+        prefixo_atual = _prefixo_rede(dispositivo_atual.interfaces[0]["IPv4"])
+        if prefixo_atual == prefixo_destino:
+            # C1: entrega direta, mesma rede local, sem roteador
+            return destino, dispositivo_atual.interfaces[0], destino.interfaces[0]
+
+        router_entrada_nome, iface_router_local = lans.get(prefixo_atual, (None, None))
+        if router_entrada_nome is None:
+            return None, None, None
+        proximo = dispositivos[router_entrada_nome]
+        iface_entrada = proximo.interface_por_nome(iface_router_local)
+        return proximo, dispositivo_atual.interfaces[0], iface_entrada
+
+    # dispositivo_atual e um Roteador
+    if dispositivo_atual.nome == router_destino:
+        # ultimo salto: entrega na rede local do destino
+        iface_saida = dispositivo_atual.interface_por_nome(iface_destino_nome)
+        return destino, iface_saida, destino.interfaces[0]
+
+    anterior = _dijkstra(grafo, dispositivo_atual.nome)
+    caminho = _reconstruir_caminho(anterior, dispositivo_atual.nome, router_destino)
+    if not caminho or len(caminho) < 2:
+        return None, None, None
+
+    proximo_nome = caminho[1]
+    proximo = dispositivos[proximo_nome]
+    iface_saida = _iface_para_vizinho(dispositivo_atual.nome, proximo_nome)
+    iface_entrada = _iface_para_vizinho(proximo_nome, dispositivo_atual.nome)
+    return proximo, iface_saida, iface_entrada
+
+
 def buscar_dispositivo(nome):
-    """Usado pela camada 3 (Lay_3.encaminhar) so para checar
-    alcancabilidade do destino. Devolve o dict bruto do JSON
-    (nao normalizado) - suficiente para o teste 'existe ou nao
-    existe' feito hoje.
+    """Unica busca por dispositivo do projeto (antes duplicada dentro
+    de camadas.py). Usado pela camada 3 so para checar alcancabilidade
+    do destino. Devolve o dict bruto do JSON (nao normalizado).
 
     TODO (R5): quando a tabela de encaminhamento por custo for
     implementada, esta funcao (ou uma nova em rede.py) deve
     devolver tambem o proximo salto e a interface de saida,
     usando os custos da Figura 1 do enunciado (hoje ausentes
-    do topologia.json).
+    do topologia.json). Enquanto essa tabela nao existir, Lay_1
+    nao tem como entregar o quadro a um dispositivo diferente de
+    quem o enviou - ver aviso no topo de camadas.py.
     """
     for bruto in _carregar_bruto():
         if bruto["dispositivo"] == nome:

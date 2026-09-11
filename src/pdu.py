@@ -13,6 +13,9 @@ class PDU:
         self.fisicos = None        # (MAC_origem, MAC_destino) (camada 2) - muda a cada salto
         self.segmento_indice = None  # posicao deste segmento (1-based) na mensagem original (C7)
         self.segmento_total = None   # quantos segmentos ao todo compoem a mensagem original (C7)
+        self.proximo_dispositivo = None
+        self.iface_saida = None
+        self.iface_entrada = None
 
     def clonar_para_segmento(self, dados_fatia, indice, total):
         segmento = PDU(dados_fatia, self.destino_nome, self.processo_origem, self.processo_destino)

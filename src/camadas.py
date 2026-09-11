@@ -46,7 +46,7 @@ class Lay_5:
         return Lay_4.segmentar(computador, pdu)
 
     @staticmethod
-    def FecharCom(computador, pdu):
+    def encerrarCom(computador, pdu):
         print(f'[{pdu.destino_nome}] L5 FECHA: sessao {pdu.sessao_id} estabelecida')
         return Lay_6.descriptografar(computador, pdu)
 
@@ -59,6 +59,7 @@ class Lay_5:
 class Lay_4:
 
     LENGTH_LIMIT = 40
+    _buffer_remontagem = {}
 
     @staticmethod
     def segmentar(computador, pdu):
@@ -72,7 +73,7 @@ class Lay_4:
                     f'segmento 1 de 1 ({len(pdu.dados)} B)')
             return Lay_3.encaminhar(computador, pdu)
 
-        fatias = [pdu.dados[i:i + Lay_4.LENGTH_LIMIT] for i in range(0, len(dados), Lay_4.LENGTH_LIMIT)]
+        fatias = [pdu.dados[i:i + Lay_4.LENGTH_LIMIT] for i in range(0, len(pdu.dados), Lay_4.LENGTH_LIMIT)]
         total = len(fatias)
         resultado = None
         for indice, fatia in enumerate(fatias, start=1):
@@ -83,13 +84,30 @@ class Lay_4:
         return resultado
     
     @staticmethod
-    def remonta(computador, pdu):
-        pdu.portas = (pdu.processo_origem, pdu.processo_destino)
-        pdu.unidade = "segmento"
-        pdu.dados = "".join(pdu.dados)
-        # TODO (C7): dividir em >= 3 segmentos numerados quando exceder o limite adotado
-        print(f'[{pdu.destino_nome}] L4 REMONTA: porta {pdu.processo_destino} -> {pdu.processo_origem}')
-        return Lay_5.FecharCom(computador, pdu)
+    def remontar(computador, pdu):
+        total = pdu.segmento_total or 1
+        
+        if total == 1:
+            print(f'[{computador.nome}] L4 REMONTA: porta {pdu.portas[1]}, segmento unico recebido')
+            return Lay_5.encerrarCom(computador, pdu)
+        
+        sessao_id = pdu.sessao_id
+        buffer = Lay_4._buffer_remontagem.setdefault(sessao_id, [])
+        buffer.append((pdu.segmento_indice, pdu.dados))
+        print(f'[{computador.nome}] L4 REMONTA: segmento {pdu.segmento_indice} de {total} recebido '
+                f'({len(buffer)}/{total})')
+
+        if len(buffer) < total:
+            # TODO (C3): quando dois fluxos concorrentes forem simulados,
+            # o buffer precisa ser demultiplexado tambem por porta/processo,
+            # nao so por sessao_id, para separar as sessoes corretamente.
+            return None  # ainda faltam segmentos: so sobe quando tiver todos
+
+        buffer.sort(key=lambda par: par[0])
+        pdu.dados = b"".join(fatia for _, fatia in buffer)
+        del Lay_4._buffer_remontagem[sessao_id]
+        print(f'[{computador.nome}] L4 REMONTA: {total} segmentos reordenados, sessao {sessao_id} completa')
+        return Lay_5.encerrarCom(computador, pdu)
 
 # Camada 3
 # Inserir o par de endereços lógicos e
@@ -97,49 +115,47 @@ class Lay_4:
 class Lay_3:
     @staticmethod
     def encaminhar(dispositivo, pdu):
-        destino_bruto = Lay_3.buscar_dispositivo(pdu.destino_nome)
-        if destino_bruto is None:
+        proximo, iface_saida, iface_entrada = proximo_salto(dispositivo, pdu.destino_nome)
+        if proximo is None:
             print(f'[{dispositivo.nome}] L3 DESCARTA: destino {pdu.destino_nome} inalcancavel')
             return None
 
         if pdu.logicos is None:
-            pdu.logicos = (dispositivo.interfaces[0]["IPv4"], None) 
+            pdu.logicos = (dispositivo.interfaces[0]["IPv4"], ip_de(pdu.destino_nome))
             pdu.unidade = "pacote"
 
-        print(f'[{dispositivo.nome}] L3 ENCAPSULA/ROTEIA: {pdu.logicos}')
+        pdu.proximo_dispositivo = proximo
+        pdu.iface_saida = iface_saida
+        pdu.iface_entrada = iface_entrada
+        print(f'[{dispositivo.nome}] L3 ENCAPSULA/ROTEIA: {pdu.logicos} -> proximo salto {proximo.nome}')
         return Lay_2.enquadrar(dispositivo, pdu)
 
     @staticmethod
     def receber(dispositivo, pdu):
         pdu.unidade = "pacote"
         if dispositivo.nome == pdu.destino_nome:
-            print(f'[{pdu.destino_nome}] L3 ENTREGA: pacote chegou ao destino final')
+            print(f'[{dispositivo.nome}] L3 ENTREGA: pacote chegou ao destino final')
             return Lay_4.remontar(dispositivo, pdu)
-        print(f'[{pdu.destino_nome}] L3 REPASSA: nao sou o destino, continuo roteando')
-        return Lay_4.remonta(dispositivo, pdu)
+        print(f'[{dispositivo.nome}] L3 REPASSA: nao sou o destino, continuo roteando')
+        return Lay_3.encaminhar(dispositivo, pdu)
 
-    @staticmethod
-    def buscar_dispositivo(nome):
-        try:
-            with open(Topologia, "r") as file:
-                data = json.load(file)
-        except FileNotFoundError:
-            print(f"Error: '{Topologia}' file was not found.")
-            return None
-        for bruto in data:
-            if bruto["dispositivo"] == nome:
-                return bruto
-        return None
 
 # Camada 2
 # Inserir o par de endereços físicos do salto,
 # delimitar o quadro e calcular a
 # verificação de erro.
 class Lay_2:
+    _contador_quadro = 0
+
     @staticmethod
     def enquadrar(dispositivo, pdu):
         pdu.unidade = "quadro"
-        print(f'[{dispositivo.nome}] L2 ENQUADRA')
+        mac_origem = pdu.iface_saida["fisico"]
+        mac_destino = pdu.iface_entrada["fisico"]
+        pdu.fisicos = (mac_origem, mac_destino)
+        Lay_2._contador_quadro += 1
+        pdu.quadro_id = f"Q{Lay_2._contador_quadro}"
+        print(f'[{dispositivo.nome}] L2 ENQUADRA: {mac_origem} -> {mac_destino}, quadro {pdu.quadro_id}')
         return Lay_1.transmitir(dispositivo, pdu)
 
     @staticmethod
@@ -156,10 +172,11 @@ class Lay_2:
 class Lay_1:
     @staticmethod
     def transmitir(dispositivo, pdu):
-        print(f'[{dispositivo.nome}] L1 TRANSMITE')
-        return Lay_1.receber(dispositivo, pdu)
+        print(f'[{dispositivo.nome}] L1 TRANSMITE: {pdu.quadro_id} ({len(pdu.dados) if hasattr(pdu.dados, "__len__") else "?"} B)')
+        proximo = pdu.proximo_dispositivo
+        return Lay_1.receber(proximo, pdu)
 
     @staticmethod
     def receber(dispositivo, pdu):
-        print(f'[{pdu.destino_nome}] L1 RECEBE')
+        print(f'[{dispositivo.nome}] L1 RECEBE')
         return Lay_2.desenquadrar(dispositivo, pdu)
