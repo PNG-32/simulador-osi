@@ -148,14 +148,6 @@ class Lay_2:
     _contador_quadro = 0
 
     @staticmethod
-    def _checksum(dados):
-        """Verificacao de erro (C6): soma dos octetos mod 256. Convencao
-        de simulacao adotada para o requisito 'calcular a verificacao de
-        erro' da camada 2 - simples de proposito, so precisa detectar 1
-        bit alterado, nao e um CRC de producao."""
-        return sum(dados) % 256
-
-    @staticmethod
     def enquadrar(dispositivo, pdu):
         pdu.unidade = "quadro"
         mac_origem = pdu.iface_saida["fisico"]
@@ -163,14 +155,14 @@ class Lay_2:
         pdu.fisicos = (mac_origem, mac_destino)
         Lay_2._contador_quadro += 1
         pdu.quadro_id = f"Q{Lay_2._contador_quadro}"
-        pdu.verificacao = Lay_2._checksum(pdu.dados)
+        pdu.verificacao = sum(pdu.dados) % 256
         print(f'[{dispositivo.nome}] L2 ENQUADRA: {mac_origem} -> {mac_destino}, quadro {pdu.quadro_id}')
         return Lay_1.transmitir(dispositivo, pdu)
 
     @staticmethod
     def desenquadrar(dispositivo, pdu):
         pdu.unidade = "pacote"
-        if Lay_2._checksum(pdu.dados) != pdu.verificacao:
+        if sum(pdu.dados) % 256 != pdu.verificacao:
             print(f'[{dispositivo.nome}] L2 DESCARTA: quadro {pdu.quadro_id} corrompido (verificacao de erro falhou)')
             return None  # R2/C6: nenhuma camada superior e acionada com quadro corrompido
         print(f'[{dispositivo.nome}] L2 DESENQUADRA: quadro {pdu.quadro_id} descartado')
@@ -182,10 +174,11 @@ class Lay_2:
 # Converter o quadro em uma sequência de
 # bits e transportá-la pelo enlace 
 class Lay_1:
+
+    #Inverte o bit menos significativo do primeiro octeto - o
+    #suficiente para violar a verificacao de erro da camada 2 (C6).
     @staticmethod
     def _corromper_um_bit(dados):
-        """Inverte o bit menos significativo do primeiro octeto - o
-        suficiente para violar a verificacao de erro da camada 2 (C6)."""
         corrompidos = bytearray(dados)
         if corrompidos:
             corrompidos[0] ^= 0b00000001
