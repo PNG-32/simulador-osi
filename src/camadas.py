@@ -8,6 +8,7 @@ class Lay_7:
     @staticmethod
     def criar_mens(computador, mensagem, destino_nome, processo_origem=None, processo_destino=None):
         pdu = PDU(mensagem, destino_nome, processo_origem, processo_destino)
+        pdu.origem_nome = computador.nome
         print(f'[{computador.nome}] L7 GERA: destino -> {destino_nome}')
         return Lay_6.criptografar(computador, pdu)
 
@@ -30,7 +31,7 @@ class Lay_6:
     @staticmethod
     def descriptografar(computador, pdu):
         pdu.dados = pdu.dados.decode('utf-8')
-        print(f'[{pdu.destino_nome}] L6 DECODIFICA: octetos UTF-8, conteudo cifrado')
+        print(f'[{computador.nome}] L6 DECODIFICA: octetos UTF-8, conteudo decifrado')
         return Lay_7.receb_mens(computador, pdu)
 
 # Camada 5
@@ -48,7 +49,7 @@ class Lay_5:
 
     @staticmethod
     def encerrarCom(computador, pdu):
-        print(f'[{pdu.destino_nome}] L5 FECHA: sessao {pdu.sessao_id} estabelecida')
+        print(f'[{computador.nome}] L5 FECHA: sessao {pdu.sessao_id} encerrada')
         return Lay_6.descriptografar(computador, pdu)
 
 # Camada 4
@@ -87,7 +88,7 @@ class Lay_4:
     @staticmethod
     def remontar(computador, pdu):
         total = pdu.segmento_total or 1
-        
+
         if total == 1:
             print(f'[{computador.nome}] L4 REMONTA: porta {pdu.portas[1]}, segmento unico recebido')
             return Lay_5.encerrarCom(computador, pdu)
@@ -96,16 +97,16 @@ class Lay_4:
         buffer = Lay_4._buffer_remontagem.setdefault(chave_fluxo, [])
         buffer.append((pdu.segmento_indice, pdu.dados))
         print(f'[{computador.nome}] L4 REMONTA: segmento {pdu.segmento_indice} de {total} recebido '
-                f'({len(buffer)}/{total})')
+              f'de {pdu.logicos[0]}:{pdu.portas[0]} ({len(buffer)}/{total})')
 
         if len(buffer) < total:
-            
-            return None  # ainda faltam segmentos: so sobe quando tiver todos
+            return None  # ainda faltam segmentos deste fluxo: so sobe quando tiver todos
 
         buffer.sort(key=lambda par: par[0])
         pdu.dados = b"".join(fatia for _, fatia in buffer)
         del Lay_4._buffer_remontagem[chave_fluxo]
-        print(f'[{computador.nome}] L4 REMONTA: {total} segmentos reordenados, sessao {pdu.sessao_id} completa')
+        print(f'[{computador.nome}] L4 REMONTA: {total} segmentos reordenados, fluxo '
+              f'{pdu.logicos[0]}:{pdu.portas[0]}->{pdu.portas[1]} completo')
         return Lay_5.encerrarCom(computador, pdu)
 
 # Camada 3
@@ -160,7 +161,7 @@ class Lay_2:
     @staticmethod
     def desenquadrar(dispositivo, pdu):
         pdu.unidade = "pacote"
-        print(f'[{pdu.destino_nome}] L2 DESENQUADRA')
+        print(f'[{dispositivo.nome}] L2 DESENQUADRA: quadro {pdu.quadro_id} descartado')
         return Lay_3.receber(dispositivo, pdu)
 
     

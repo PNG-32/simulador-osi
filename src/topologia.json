@@ -38,11 +38,13 @@
 			},
 			{
 				"": "e1",
-				"info": "para R4"
+				"info": "para R4",
+				"custo": 1
 			},
 			{
 				"": "e2",
-				"info": "para R2"
+				"info": "para R2",
+				"custo": 1
 			}
 		],
 		"IPv4": [
@@ -73,11 +75,13 @@
 		"interface": [
 			{
 				"": "e0",
-				"info": "para R1"
+				"info": "para R1",
+				"custo": 1
 			},
 			{
 				"": "e1",
-				"info": "para R3"
+				"info": "para R3",
+				"custo": 2
 			},
 			{
 				"": "e2",
@@ -112,11 +116,13 @@
 		"interface": [
 			{
 				"": "e0",
-				"info": "para R4"
+				"info": "para R4",
+				"custo": 1
 			},
 			{
 				"": "e1",
-				"info": "para R2"
+				"info": "para R2",
+				"custo": 2
 			},
 			{
 				"": "e2",
@@ -151,11 +157,13 @@
 		"interface": [
 			{
 				"": "e0",
-				"info": "para R1"
+				"info": "para R1",
+				"custo": 1
 			},
 			{
 				"": "e1",
-				"info": "para R3"
+				"info": "para R3",
+				"custo": 1
 			}
 		],
 		"IPv4": [
