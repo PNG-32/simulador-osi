@@ -15,6 +15,7 @@ class Lay_7:
     def receb_mens(computador, pdu):
         print(f'[{pdu.destino_nome}] L7 ENTREGA: receber -> {computador.nome}')
         print(f'[{pdu.destino_nome}] MENSAGEM DO {computador.nome} -> {pdu.dados}\n')
+        return pdu
 
 # Camada 6
 # Converter texto em sequência de octetos, registrar o esquema de codificação 
@@ -91,22 +92,20 @@ class Lay_4:
             print(f'[{computador.nome}] L4 REMONTA: porta {pdu.portas[1]}, segmento unico recebido')
             return Lay_5.encerrarCom(computador, pdu)
         
-        sessao_id = pdu.sessao_id
-        buffer = Lay_4._buffer_remontagem.setdefault(sessao_id, [])
+        chave_fluxo = (pdu.logicos[0], pdu.portas[0], pdu.portas[1])  # (IP origem, porta origem, porta destino) - o "socket" da camada 4
+        buffer = Lay_4._buffer_remontagem.setdefault(chave_fluxo, [])
         buffer.append((pdu.segmento_indice, pdu.dados))
         print(f'[{computador.nome}] L4 REMONTA: segmento {pdu.segmento_indice} de {total} recebido '
                 f'({len(buffer)}/{total})')
 
         if len(buffer) < total:
-            # TODO (C3): quando dois fluxos concorrentes forem simulados,
-            # o buffer precisa ser demultiplexado tambem por porta/processo,
-            # nao so por sessao_id, para separar as sessoes corretamente.
+            
             return None  # ainda faltam segmentos: so sobe quando tiver todos
 
         buffer.sort(key=lambda par: par[0])
         pdu.dados = b"".join(fatia for _, fatia in buffer)
-        del Lay_4._buffer_remontagem[sessao_id]
-        print(f'[{computador.nome}] L4 REMONTA: {total} segmentos reordenados, sessao {sessao_id} completa')
+        del Lay_4._buffer_remontagem[chave_fluxo]
+        print(f'[{computador.nome}] L4 REMONTA: {total} segmentos reordenados, sessao {pdu.sessao_id} completa')
         return Lay_5.encerrarCom(computador, pdu)
 
 # Camada 3

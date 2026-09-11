@@ -2,11 +2,12 @@ import json
 from dispositivos import *
 from rede import *
 
+Active = True
 dispositivos = carregar_dispositivos()
-print('\nMaquina de OSI\n')
+print('\nMaquina de OSI')
 
-while True:
-    origem_nome = input('Qual o computador de origem?: ')
+while Active:
+    origem_nome = input('\nQual o computador de origem?: ')
     origem = dispositivos.get(origem_nome)
     if origem is None:
         print('Dispositivo de origem invalido')
@@ -23,6 +24,16 @@ while True:
         else:
             print('\nProcessando...\n')
             origem.enviar(mensagem, destino_nome)
-        break
-    break
+        break  
+
+    while True:
+            decisão = input('Deseja Enviar mais alguma mensagem? (y/n): ').lower()
+            if decisão == "y":
+                break
+            elif decisão == "n":
+                print('\nDesligando...\n')
+                Active = False
+                break
+            else:
+                print('Comando Invalido')
     
