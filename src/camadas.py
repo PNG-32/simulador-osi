@@ -57,18 +57,36 @@ class Lay_5:
 #exceder o limite adotado, e remontá-los
 #em ordem na camada 4 do destino
 class Lay_4:
+
+    LENGTH_LIMIT = 40
+
     @staticmethod
     def segmentar(computador, pdu):
         pdu.portas = (pdu.processo_origem, pdu.processo_destino)
         pdu.unidade = "segmento"
-        # TODO (C7): dividir em >= 3 segmentos numerados quando exceder o limite adotado
-        print(f'[{computador.nome}] L4 SEGMENTA: porta {pdu.processo_origem} -> {pdu.processo_destino}')
-        return Lay_3.encaminhar(computador, pdu)
+
+        if len(pdu.dados) <= Lay_4.LENGTH_LIMIT:
+            pdu.segmento_indice = 1
+            pdu.segmento_total = 1
+            print(f'[{computador.nome}] L4 SEGMENTA: porta {pdu.processo_origem} -> {pdu.processo_destino}, '
+                    f'segmento 1 de 1 ({len(pdu.dados)} B)')
+            return Lay_3.encaminhar(computador, pdu)
+
+        fatias = [pdu.dados[i:i + Lay_4.LENGTH_LIMIT] for i in range(0, len(dados), Lay_4.LENGTH_LIMIT)]
+        total = len(fatias)
+        resultado = None
+        for indice, fatia in enumerate(fatias, start=1):
+            segmento = pdu.clonar_para_segmento(fatia, indice, total)
+            print(f'[{computador.nome}] L4 SEGMENTA: porta {pdu.processo_origem} -> {pdu.processo_destino}, '
+                    f'segmento {indice} de {total} ({len(fatia)} B)')
+            resultado = Lay_3.encaminhar(computador, segmento)
+        return resultado
     
     @staticmethod
     def remonta(computador, pdu):
         pdu.portas = (pdu.processo_origem, pdu.processo_destino)
         pdu.unidade = "segmento"
+        pdu.dados = "".join(pdu.dados)
         # TODO (C7): dividir em >= 3 segmentos numerados quando exceder o limite adotado
         print(f'[{pdu.destino_nome}] L4 REMONTA: porta {pdu.processo_destino} -> {pdu.processo_origem}')
         return Lay_5.FecharCom(computador, pdu)
@@ -95,9 +113,9 @@ class Lay_3:
     def receber(dispositivo, pdu):
         pdu.unidade = "pacote"
         if dispositivo.nome == pdu.destino_nome:
-            print(f'[{dispositivo.nome}] L3 ENTREGA: pacote chegou ao destino final')
+            print(f'[{pdu.destino_nome}] L3 ENTREGA: pacote chegou ao destino final')
             return Lay_4.remontar(dispositivo, pdu)
-        print(f'[{dispositivo.nome}] L3 REPASSA: nao sou o destino, continuo roteando')
+        print(f'[{pdu.destino_nome}] L3 REPASSA: nao sou o destino, continuo roteando')
         return Lay_4.remonta(dispositivo, pdu)
 
     @staticmethod
