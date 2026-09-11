@@ -22,15 +22,24 @@ while Active:
         elif destino_nome == origem_nome:
             print('Não e possivel enviar no mesmo dispositivo')
         else:
+            while True:
+                error_dec = input('Deseja inserir um erro na conexão? (y/n): ').lower()
+                if error_dec == "y":
+                    armar_erro_de_transmissao(origem_nome, destino_nome)
+                    break
+                elif error_dec == "n":
+                    break
+                else:
+                    print('Comando Invalido')
             print('\nProcessando...\n')
             origem.enviar(mensagem, destino_nome)
         break  
 
     while True:
-            decisão = input('Deseja Enviar mais alguma mensagem? (y/n): ').lower()
-            if decisão == "y":
+            dec = input('Deseja enviar mais alguma mensagem? (y/n): ').lower()
+            if dec == "y":
                 break
-            elif decisão == "n":
+            elif dec == "n":
                 print('\nDesligando...\n')
                 Active = False
                 break

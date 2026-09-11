@@ -11,6 +11,8 @@ class PDU:
         self.portas = None         # (porta_origem, porta_destino) (camada 4)
         self.logicos = None        # (IP_origem, IP_destino) (camada 3) - fixo ate o destino
         self.fisicos = None        # (MAC_origem, MAC_destino) (camada 2) - muda a cada salto
+        self.quadro_id = None      # ex: "Q1", "Q2"... numeracao do quadro no enlace atual (R2)
+        self.verificacao = None    # checksum do quadro atual (camada 2, C6) - recalculado a cada enlace
         self.segmento_indice = None  # posicao deste segmento (1-based) na mensagem original (C7)
         self.segmento_total = None   # quantos segmentos ao todo compoem a mensagem original (C7)
         self.proximo_dispositivo = None

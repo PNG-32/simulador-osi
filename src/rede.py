@@ -6,12 +6,14 @@ from dispositivos import Computador, Roteador
 _DIR_BASE = os.path.dirname(os.path.abspath(__file__))
 Topologia = os.path.join(_DIR_BASE, "topologia.json")
 
+#"""Uniformiza o formato do topologia.json. Computador vs
+#Roteador e decidido pelo formato do dado (str = uma interface,
+#list = varias), nao pelo nome do dispositivo - assim o arquivo
+#de topologia continua podendo ser trocado livremente (requisito
+#do enunciado: trocar a rede so trocando o JSON)."""
+
 def _normalizar_interfaces(bruto):
-    """Uniformiza o formato do topologia.json. Computador vs
-    Roteador e decidido pelo formato do dado (str = uma interface,
-    list = varias), nao pelo nome do dispositivo - assim o arquivo
-    de topologia continua podendo ser trocado livremente (requisito
-    do enunciado: trocar a rede so trocando o JSON)."""
+    
     if isinstance(bruto["interface"], str):
         return [{
             "interface": bruto["interface"],
@@ -30,9 +32,8 @@ def _normalizar_interfaces(bruto):
         })
     return interfaces
 
-
+#Le o JSON da topologia e devolve a lista de dicts crus."""
 def _carregar_bruto(caminho=None):
-    """Le o JSON da topologia e devolve a lista de dicts crus."""
     caminho_completo = caminho or Topologia
     try:
         with open(caminho_completo, "r") as file:
@@ -41,9 +42,8 @@ def _carregar_bruto(caminho=None):
         print(f"Error: '{caminho_completo}' file was not found.")
         return []
 
-
+#Le o arquivo de topologia e devolve {nome: Dispositivo}."""
 def carregar_dispositivos(caminho="topologia.json"):
-    """Le o arquivo de topologia e devolve {nome: Dispositivo}."""
     caminho_completo = os.path.join(_DIR_BASE, caminho) if not os.path.isabs(caminho) else caminho
     data = _carregar_bruto(caminho_completo)
 
@@ -56,19 +56,18 @@ def carregar_dispositivos(caminho="topologia.json"):
         dispositivos[nome] = classe(nome, interfaces)
     return dispositivos
 
-
+# Prefixo /24: os 3 primeiros octetos do IPv4."""
 def _prefixo_rede(ip):
-    """Prefixo /24: os 3 primeiros octetos do IPv4."""
     return ".".join(ip.split(".")[:3])
 
+#"""Monta, a partir do topologia.json:
+#    - grafo: {roteador: {roteador_vizinho: custo}}, so enlaces
+#    roteador-roteador (interfaces cujo info comeca com 'para ').
+#    - lans: {prefixo_rede: (roteador_de_entrada, nome_da_interface_local)},
+#    para as interfaces de roteador que dao numa rede local (info
+#    'Rede X'), usado para saber por qual roteador uma rede e servida.
+
 def _construir_grafo():
-    """Monta, a partir do topologia.json:
-    - grafo: {roteador: {roteador_vizinho: custo}}, so enlaces
-      roteador-roteador (interfaces cujo info comeca com 'para ').
-    - lans: {prefixo_rede: (roteador_de_entrada, nome_da_interface_local)},
-      para as interfaces de roteador que dao numa rede local (info
-      'Rede X'), usado para saber por qual roteador uma rede e servida.
-    """
     grafo = {}
     lans = {}
     for bruto in _carregar_bruto():
@@ -197,6 +196,32 @@ def proximo_salto(dispositivo_atual, destino_nome):
     iface_saida = _iface_para_vizinho(dispositivo_atual.nome, proximo_nome)
     iface_entrada = _iface_para_vizinho(proximo_nome, dispositivo_atual.nome)
     return proximo, iface_saida, iface_entrada
+
+
+# Injecao manual de erro de bit (C6). Sera acionada pela interface (V6);
+# ate la, chame armar_erro_de_transmissao("R4", "R3") antes de origem.enviar(...)
+# para reproduzir o cenario E6 do enunciado.
+_ERRO_PENDENTE = None  # (nome_origem, nome_destino) do enlace com erro agendado, ou None
+
+
+#Agenda a corrupcao de 1 bit no PROXIMO quadro que atravessar o
+#enlace nome_origem -> nome_destino. Disparo unico: depois de
+#corromper um quadro, o agendamento se limpa sozinho.
+
+def armar_erro_de_transmissao(nome_origem, nome_destino):
+
+    global _ERRO_PENDENTE
+    _ERRO_PENDENTE = (nome_origem, nome_destino)
+
+#Chamado por Lay_1.transmitir a cada quadro. Devolve True (e
+#limpa o agendamento) se HAVIA um erro agendado exatamente para
+#este enlace nesta direcao.
+def consumir_erro_pendente(nome_origem, nome_destino):
+    global _ERRO_PENDENTE
+    if _ERRO_PENDENTE == (nome_origem, nome_destino):
+        _ERRO_PENDENTE = None
+        return True
+    return False
 
 
 def buscar_dispositivo(nome):
