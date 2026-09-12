@@ -67,6 +67,7 @@ class Node:
             if i.find('/') != -1:
                 i = i.split('/')[0]
             ipx.append(f"{int(i):b}".rjust(8, "0"))
+        # Ignore this horror, please
         return ".".join([str(int(x, 2) if x != "" else "0") for x in re.sub("([0-9]{0,8})", "\\1.", "".join(ipx)[0:size])[0:-1].split(".")])
 
 class Network(Node):
