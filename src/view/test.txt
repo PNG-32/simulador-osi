@@ -1,10 +1,29 @@
-{ id: 0, name: Estrutura, type: VIEW, ip: , mask: None }
-{ id: 1, name: R1, type: ROUTER, ip: 10.0.1.0/24, mask: 10.0.1.0 }
-{ id: 5, name: H1, type: HOST, ip: 10.0.1.10, mask: None }
-{ id: 6, name: H2, type: HOST, ip: 10.0.1.11, mask: None }
-{ id: 2, name: R2, type: ROUTER, ip: 10.0.2.0/24, mask: 10.0.2.0 }
-{ id: 7, name: H3, type: HOST, ip: 10.0.2.10, mask: None }
-{ id: 3, name: R3, type: ROUTER, ip: 10.0.3.0/24, mask: 10.0.3.0 }
-{ id: 8, name: H4, type: HOST, ip: 10.0.3.10, mask: None }
-{ id: 9, name: H5, type: HOST, ip: 10.0.3.11, mask: None }
-{ id: 4, name: R4, type: ROUTER, ip: 10.0.4.0/24, mask: 10.0.4.0 }
+graph TD
+subgraph __n0 ["`Estrutura`"]
+subgraph __n1 ["`Rede 10.0.1.0/24`"]
+__1{"`R1`"}
+__5{"`H1 :: 10.0.1.10`"}
+__1 ----- __5
+__6{"`H2 :: 10.0.1.11`"}
+__1 ----- __6
+end
+__1 ----- __4
+__1 ----- __2
+subgraph __n2 ["`Rede 10.0.2.0/24`"]
+__2{"`R2`"}
+__7{"`H3 :: 10.0.2.10`"}
+__2 ----- __7
+end
+__2 ----- __3
+subgraph __n3 ["`Rede 10.0.3.0/24`"]
+__3{"`R3`"}
+__8{"`H4 :: 10.0.3.10`"}
+__3 ----- __8
+__9{"`H5 :: 10.0.3.11`"}
+__3 ----- __9
+end
+__3 ----- __4
+subgraph __n4 ["`Rede 10.0.4.0/24`"]
+__4{"`R4`"}
+end
+end

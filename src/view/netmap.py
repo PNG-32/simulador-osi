@@ -41,7 +41,7 @@ class Node:
 
     @abstractmethod
     def display(self, out: Output) -> None:
-        self.debug()
+        #self.debug()
         pass #away
 
     def debug(self) -> None:
@@ -83,8 +83,8 @@ class Network(Node):
     def display(self, out: Output) -> None:
         super().display(out)
         if not self._mesh_only:
-            out.write(f"__{self._id}{{\"`{self.name}`\"}}")
             out.write(f"subgraph __n{self._id} [\"`Rede {self.ip}`\"]")
+            out.write(f"__{self._id}{{\"`{self.name}`\"}}")
         else:
             out.write(f"subgraph __n{self._id} [\"`{self.name}`\"]")
         for node in self.subnodes.values():
@@ -157,7 +157,8 @@ class NetMap:
             data = json.load(f)
         hosts = []
         routers = []
-        mesh    = dict[str,Node]()
+        mesh    = dict[Node,list[str]]()
+        rmesh   = dict[str,Node]()
         net     = dict[str,Router]()
         for device in data:
             if device["type"] == "HOST":
@@ -166,17 +167,21 @@ class NetMap:
                 routers.append(device)
         for router in routers:
             node = Router(router["name"], router["mask"])
+            rmesh[router["mask"]] = node
             for port in router["ports"]:
                 if port["type"] == "R2R":
                     if "topnet" not in port:
                         raise KeyError()
-                    if port["topnet"] not in mesh:
-                        mesh[port["topnet"]] = node
+                    if node not in mesh:
+                        mesh[node] = [port["topnet"]]
                     else:
-                        mesh[port["topnet"]].connect(node)
+                        mesh[node].append(port["topnet"])
                 elif port["type"] == "NETWORK":
                     net[Node.maskof(node.ip) or node.ip] = node
             self.structure.add(node)
+        for m in mesh:
+            for t in mesh[m]:
+                rmesh[t].connect(m)
         for host in hosts:
             parent : Network|None = None
             for router in net.values():
@@ -185,14 +190,13 @@ class NetMap:
             if parent is not None:
                 node = Computer(host["name"], host["ip"], parent)
                 Network.add(parent, node)
-
 class IOWriter(Output):
     @override
     def write(self, what: str):
-        #print(what)
+        print(what)
         pass #away
 
 if __name__ == "__main__":
     io = IOWriter()
-    io.write("graph LR")
+    io.write("graph TD")
     NetMap( os.getcwd() + "/../topologia.json").structure.display(io)
