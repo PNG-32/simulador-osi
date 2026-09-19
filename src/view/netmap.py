@@ -5,6 +5,8 @@ import re
 
 from typing_extensions import override
 
+#See https://mermaid.js.org/syntax/flowchart.html for more info
+
 class Output:
     def __init__(self) -> None:
         self.context = dict[str, dict]()
@@ -90,7 +92,7 @@ class Network(Node):
         for node in self.subnodes.values():
             node.display(out)
             if not self._mesh_only:
-                out.write(f"__{self._id} ----- __{node._id}")
+                out.write(f"__{self._id} {self.name + node.name}@---- __{node._id}")
         out.write("end")
 
 
@@ -126,7 +128,7 @@ class Router(Network):
             visited[b._id] = []
         visited[a._id].append(b._id)
         visited[b._id].append(a._id)
-        out.write(f"__{a._id} ----- __{b._id}")
+        out.write(f"__{a._id} {a.name + b.name}@---- __{b._id}")
 
 class Computer(Node):
     def __init__(self, name: str, ip: str, parent: object) -> None:
@@ -190,13 +192,24 @@ class NetMap:
             if parent is not None:
                 node = Computer(host["name"], host["ip"], parent)
                 Network.add(parent, node)
+
 class IOWriter(Output):
     @override
     def write(self, what: str):
         print(what)
         pass #away
 
+class Mapper:
+    @staticmethod
+    def map_path(io: Output, file: str, path: list[str]):
+        NetMap(os.getcwd() + file).structure.display(io)
+        for i in range(len(path)-1):
+            io.write(f"linkStyle {path[i]}{path[i+1]} stroke:red;")
+
 if __name__ == "__main__":
     io = IOWriter()
-    io.write("graph TD")
-    NetMap( os.getcwd() + "/../topologia.json").structure.display(io)
+    io.write("```mermaid")
+    io.write("graph LR")
+    Mapper.map_path(IOWriter(), "/../topologia.json", ["H1", "R1", "R2", "R3", "H4"])
+
+    io.write("```")
